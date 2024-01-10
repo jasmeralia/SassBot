@@ -11,6 +11,7 @@ def isModelOnline(cam4UserName):
     icon = 'images/errIcon.png'
     try:
         headers = {"User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:75.0) Gecko/20100101 Firefox/75.0"}
+        print(f"Checking https://www.cam4.com/rest/v1.0/search/performer/{cam4UserName} ...")
         results = requests.get(f"https://www.cam4.com/rest/v1.0/search/performer/{cam4UserName}", headers=headers)
         time.sleep(1)
         try:
@@ -22,4 +23,5 @@ def isModelOnline(cam4UserName):
             print("cam4 api didn't respond?")
     except requests.exceptions.ConnectTimeout:
         print("connection timed out to cam4 api. Bot detection or rate limited?")
+    print(f"Cam4 isOnlione = {isOnline}")
     return isOnline, title, thumbUrl, icon

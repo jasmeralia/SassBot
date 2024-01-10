@@ -8,6 +8,7 @@ def isModelOnline(twitchChannelName):
     thumbUrl = ''
     isOnline = False
     icon = 'images/errIcon.png'
+    print(f"Checking https://www.twitch.tv/{twitchChannelName} ...")
     page = requests.get(f'https://www.twitch.tv/{twitchChannelName}')
     time.sleep(1)
     soup = BeautifulSoup(page.content, "html.parser")
@@ -23,6 +24,7 @@ def isModelOnline(twitchChannelName):
         isOnlineJson = twitchJson['publication']['isLiveBroadcast']
         if isOnlineJson and thumbUrl == thumbUrlReq.url:
             isOnline = True
+    print(f"Twitch isOnline = {isOnline}")
     return isOnline, title, thumbUrl, icon
 
 def getTwitchJson(soup):

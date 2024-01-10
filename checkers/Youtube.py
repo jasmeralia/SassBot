@@ -8,6 +8,7 @@ def isModelOnline(ytUserName):
     title =  "placeholder youtube title"
     thumbUrl = ""
     icon = 'images/errIcon.png'
+    print(f"Checking {ytUrl} ...")
     page = requests.get(ytUrl, cookies={'CONSENT': 'YES+42'})
     soup = BeautifulSoup(page.content, "html.parser")
     live = soup.find("link", {"rel": "canonical"})
@@ -24,6 +25,7 @@ def isModelOnline(ytUserName):
             icon = iconJson['contents']['twoColumnWatchNextResults']['results']['results']['contents'][1]['videoSecondaryInfoRenderer']['owner']['videoOwnerRenderer']['thumbnail']['thumbnails'][0]['url']
         else:
             print("can't get yt icon")
+    print(f"YouTube isOnline = {online}")
     return online,title, thumbUrl, icon
 
 def getIconJson(scripts):

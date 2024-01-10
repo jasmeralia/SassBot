@@ -9,6 +9,7 @@ def isModelOnline(cbUserName):
     title = "placeholder cb title"
     thumbUrl = ""
     icon = 'images/errIcon.png'
+    print(f"Checking {Constants.cbApiUrl} ...")
     onlineModels = requests.get(Constants.cbApiUrl)
     time.sleep(3)
     try:
@@ -20,4 +21,5 @@ def isModelOnline(cbUserName):
                 thumbUrl = result['image_url'] + "?" + str(int(time.time()))
     except json.decoder.JSONDecodeError:
         print("cb api didn't respond")
+    print(f"CB isOnline = {isOnline}")
     return isOnline, title, thumbUrl, icon

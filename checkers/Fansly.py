@@ -13,6 +13,7 @@ def isModelOnline(fansUserName):
     title = Constants.fansDefaultTitle
     driverCreator = SeleniumDriverCreator()
     driver = driverCreator.createDriver()
+    print(f"Checking {fansUrl} ...")
     driver.get(fansUrl)
     time.sleep(10)
     checkForEnterButton(driver)
@@ -28,6 +29,7 @@ def isModelOnline(fansUserName):
     driver.quit()
     if len(online) > 0:
         isOnline = True
+    print(f"Fansly isOnline = {isOnline}")
     return isOnline, title, thumbUrl, icon
 
 def checkForEnterButton(driver):

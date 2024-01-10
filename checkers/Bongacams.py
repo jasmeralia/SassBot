@@ -9,6 +9,7 @@ def isModelOnline(bcUserName):
     thumbUrl = ''
     isOnline = False
     icon = 'images/errIcon.png'
+    print(f"Checking https://bongacams.com/{bcUserName} ...")
     page = requests.get(f'https://bongacams.com/{bcUserName}')
     time.sleep(1)
     if page.status_code == 200:
@@ -28,6 +29,7 @@ def isModelOnline(bcUserName):
             icon = bcJson['chatHeaderOptions']['profileImage']
             icon = "https:" + icon
             isOnline = not bcJson['chatShowStatusOptions']['isOffline']
+    print(f"BC isOnlione = {isOnline}")
     return isOnline, title, thumbUrl, icon
 
 

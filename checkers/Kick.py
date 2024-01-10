@@ -8,6 +8,7 @@ def isModelOnline(kickUserName):
     apiUrl = f"https://kick.com/api/v1/channels/{kickUserName}"
     driverCreator = SeleniumDriverCreator()
     driver = driverCreator.createDriver()
+    print(f"Checking {apiUrl} ...")
     driver.get(apiUrl)
     time.sleep(3)
     content = driver.page_source.split('<body>')
@@ -16,6 +17,7 @@ def isModelOnline(kickUserName):
     else:
         jsonText = content[1].split('</body></html>')
         isOnline, title, thumbUrl, icon = getStreamInfo(jsonText)
+    print(f"Kick isOnline = {isOnline}")
     return isOnline, title, thumbUrl, icon
 
 def setDefaultStreamValues():

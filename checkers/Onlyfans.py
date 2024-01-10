@@ -12,6 +12,7 @@ def isModelOnline(ofUserName):
     reString = r'^https:\/\/.+avatar.jpg$'
     driverCreator = SeleniumDriverCreator()
     driver = driverCreator.createDriver()
+    print(f"Checking {ofUrl} ...")
     driver.get(ofUrl)
     time.sleep(10)
     online = driver.find_elements(By.XPATH, '/html/body/div/div[2]/main/div[1]/div[1]/div/div[2]/div/div[2]/div[1]/a/span')
@@ -25,4 +26,5 @@ def isModelOnline(ofUserName):
     isOnline = False
     if len(online) > 0:
         isOnline = True
+    print(f"OF isOnline = {isOnline}")
     return isOnline, title, thumbUrl, icon

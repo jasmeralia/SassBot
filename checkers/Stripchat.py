@@ -9,6 +9,7 @@ def isModelOnline(scUserName):
     isOnline = False
     icon = 'images/errIcon.png'
     headers = {"User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:75.0) Gecko/20100101 Firefox/75.0"}
+    print(f"Checking https://stripchat.com/api/vr/v2/models/username/{scUserName} ...")
     scJson = requests.get(f'https://stripchat.com/api/vr/v2/models/username/{scUserName}', headers=headers)
     time.sleep(1)
     if scJson.status_code == 200:
@@ -20,4 +21,5 @@ def isModelOnline(scUserName):
             thumbUrl = scJson['model']['previewUrl']
         except json.decoder.JSONDecodeError:
             pass
+    print(f"SC isOnline = {isOnline}")
     return isOnline, title, thumbUrl, icon
