@@ -38,7 +38,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/${{ github.actor }}/of-dl:latest
-            ghcr.io/${{ github.actor }}/of-dl:${{ steps.version.outputs.version }}
+            ghcr.io/${{ github.actor }}/sassbot:latest
+            ghcr.io/${{ github.actor }}/sassbot:${{ steps.version.outputs.version }}
           build-args: |
             VERSION=${{ steps.version.outputs.version }}
