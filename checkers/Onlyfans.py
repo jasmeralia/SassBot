@@ -1,21 +1,47 @@
-from Constants import Constants
+from DefaultConstants import Settings as Settings
 import re
 import asyncio
 import nodriver as uc
-import NoDriverBrowserCreator as ndb
-from pyvirtualdisplay import Display
-import globals
-import platform
+import utils.NoDriverBrowserCreator as ndb
+import logging
+from utils.StaticMethods import GetThumbnail
+
+baseSettings = Settings()
+logger = logging.getLogger(__name__)
+logger.setLevel(baseSettings.SASSBOT_LOG_LEVEL)
+
+async def isModelOnline(ofUserName):
+    isOnline = False
+    ofUrl = f"https://onlyfans.com/{ofUserName}"
+    title = baseSettings.ofDefaultTitle
+    tempThumbUrl = ""
+    icon = baseSettings.defaultIcon
+    browser = None
+    page = None
+    try:
+        browser = await ndb.GetBrowser(proxy=baseSettings.OF_PROXY, checkName="onlyfans")
+        await asyncio.sleep(1*baseSettings.NODRIVER_WAIT_MULTIPLIER)
+        page = await browser.get(ofUrl, new_window=True)
+        await asyncio.sleep(1*baseSettings.NODRIVER_WAIT_MULTIPLIER)
+        await page.save_screenshot("Ofscreenshot.jpg")
+        isOnline = await IsLiveBadge(page)
+        icon  = await GetIcon(page)
+    except Exception as e:
+        logger.warning(f"Error getting browser for Onylyfans: {e}")
+    finally:
+        await ndb.CloseNDBrowser(browser, page, checkName="onlyfans")
+    thumbUrl = GetThumbnail(tempThumbUrl, baseSettings.ofThumbnail)
+    return isOnline, title, thumbUrl, icon
 
 async def GetIcon(page:uc.Tab):
-    icon = 'images/errIcon.png'
+    icon = baseSettings.defaultIcon
     reString = r'^https:\/\/.+avatar.jpg$'
     try:
         imageElements = await page.find_all("data-v-325c6981")
         for element in imageElements:
             if element.attrs.get("src") and re.search(reString, element.attrs.get("src")):
                 icon = element.attrs.get("src")
-    except:
+    except asyncio.exceptions.TimeoutError:
         pass
     return icon
 
@@ -25,40 +51,6 @@ async def IsLiveBadge(page:uc.Tab):
         liveBadge = await page.find("g-avatar__icon m-live", best_match=True)
         if liveBadge:
             live = True
-    except TimeoutError:
+    except asyncio.exceptions.TimeoutError:
         pass
     return live
-
-async def GetOnlineStatus(ofUserName):
-    isOnline = False
-    ofUrl = f"https://onlyfans.com/{ofUserName}"
-    title = Constants.ofDefaultTitle
-    thumbUrl = ""
-    icon = 'images/errIcon.png'
-    try:
-        if platform.system() == "Linux":
-            display = Display(visible=0, size=(1080,720))
-            display.start()
-        browser = await ndb.GetBrowser()
-        await asyncio.sleep(10)
-        page = await browser.get(ofUrl, new_window=True)
-        await asyncio.sleep(10)
-        await page.save_screenshot("Ofscreenshot.jpg")
-        isOnline = await IsLiveBadge(page)
-        icon  = await GetIcon(page)
-        await page.close()
-        await asyncio.sleep(2)
-        browser.stop()
-        await asyncio.sleep(2)
-        globals.browserOpen = False
-        if platform.system() == "Linux": display.stop()
-    except Exception as e:
-        print(f"Error getting browser for Onylyfans: {e}")
-        globals.browserOpen = False
-    return isOnline, title, thumbUrl, icon
-
-
-def isModelOnline(ofUserName):
-    isOnline, title, thumbUrl, icon = uc.loop().run_until_complete(GetOnlineStatus(ofUserName))
-
-    return isOnline, title, thumbUrl, icon

@@ -1,43 +1,36 @@
-from Constants import Constants
+from DefaultConstants import Settings as Settings
 import asyncio
 import nodriver as uc
-import NoDriverBrowserCreator as ndb
-from pyvirtualdisplay import Display
-import globals
-import platform
+import utils.NoDriverBrowserCreator as ndb
+import logging
+from utils.StaticMethods import GetThumbnail
 
-def isModelOnline(fansUserName):
-    isOnline, title, thumbUrl, icon = uc.loop().run_until_complete(GetOnlineStatus(fansUserName))
-    return isOnline, title, thumbUrl, icon
+baseSettings = Settings()
+logger = logging.getLogger(__name__)
+logger.setLevel(baseSettings.SASSBOT_LOG_LEVEL)
 
-async def GetOnlineStatus(fansUserName):
+async def isModelOnline(fansUserName):
     fansUrl = f"https://fansly.com/{fansUserName}"
-    thumbUrl = ""
-    title = Constants.fansDefaultTitle
+    tempThumbUrl = ""
+    title = baseSettings.fansDefaultTitle
     isOnline = False
-    icon = 'images/errIcon.png'
+    icon = baseSettings.defaultIcon
+    browser = None
+    page = None
     try:
-        if platform.system() == "Linux":
-            display = Display(visible=0, size=(1080,720))
-            display.start()
-        browser = await ndb.GetBrowser()
-        await asyncio.sleep(10)
+        browser = await ndb.GetBrowser(proxy=baseSettings.FANS_PROXY, checkName="fansly")
+        await asyncio.sleep(1*baseSettings.NODRIVER_WAIT_MULTIPLIER)
         page = await browser.get(fansUrl)
-        await asyncio.sleep(10)
+        await asyncio.sleep(1*baseSettings.NODRIVER_WAIT_MULTIPLIER)
         await ClickEnterButton(page)
         isOnline = await IsLiveBadge(page)
-        await asyncio.sleep(2)
         icon = await GetIcon(page)
         await page.save_screenshot("Fansscreenshot.jpg")
-        await page.close()
-        await asyncio.sleep(2)
-        browser.stop()
-        await asyncio.sleep(2)
-        globals.browserOpen = False
-        if platform.system() == "Linux": display.stop()
     except Exception as e:
-        print(f"Error when getting browser for Fansly: {e}")
-        globals.browserOpen = False
+        logger.warning(f"Error when getting browser for Fansly: {e}")
+    finally:
+        await ndb.CloseNDBrowser(browser, page, checkName="fansly")
+    thumbUrl = GetThumbnail(tempThumbUrl, baseSettings.fansThumbnail)
     return isOnline, title, thumbUrl, icon
 
 async def ClickEnterButton(page:uc.Tab):
@@ -45,8 +38,8 @@ async def ClickEnterButton(page:uc.Tab):
         enterBtn = await page.find("Enter",best_match=True)
         if enterBtn:
             await enterBtn.click()
-            await asyncio.sleep(5)
-    except TimeoutError:
+            await asyncio.sleep(.5 * baseSettings.NODRIVER_WAIT_MULTIPLIER)
+    except asyncio.exceptions.TimeoutError:
         pass
 
 async def IsLiveBadge(page:uc.Tab):
@@ -55,19 +48,19 @@ async def IsLiveBadge(page:uc.Tab):
         liveBadge = await page.find("live-badge bold font-size-sm", best_match=True)
         if liveBadge:
             live = True
-    except TimeoutError:
+    except asyncio.exceptions.TimeoutError:
         pass
     return live
 
 async def GetIcon(page:uc.Tab):
-    icon = 'images/errIcon.png'
+    icon = baseSettings.defaultIcon
     try:
         iconElements = await page.find_all("image cover")
         await iconElements[1].click()
-        await asyncio.sleep(2)
+        await asyncio.sleep(.5 * baseSettings.NODRIVER_WAIT_MULTIPLIER)
         iconElement = await page.find("image-overlay-flex", best_match=True)
         await iconElement.save_screenshot( "images/fansIcon.jpg")
         icon = "images/fansIcon.jpg"
-    except:
+    except asyncio.exceptions.TimeoutError:
         pass
     return icon

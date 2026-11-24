@@ -1,0 +1,31 @@
+name: Docker Image creator for sassbot experimental
+
+on:
+  push:
+    branches:
+      - '**'
+env: 
+  IMAGEVER: ${{ github.ref_name == 'master' && 'latest' || 'experimental' }}
+
+jobs:
+  build-and-push:
+    if: github.repository == 'Bombg/SassBot'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: bombg
+          password: ${{ secrets.GH_PAT }}
+      - name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/bombg/sassbot:${{env.IMAGEVER}}
+          platforms: linux/arm64, linux/amd64

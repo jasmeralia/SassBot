@@ -1,4 +1,10 @@
 import tanjun
+import logging
+from DefaultConstants import Settings as Settings
+
+baseSettings = Settings()
+logger = logging.getLogger(__name__)
+logger.setLevel(baseSettings.SASSBOT_LOG_LEVEL)
 
 
 class Permissions(object):
@@ -19,5 +25,5 @@ class Permissions(object):
                 else:
                     await ctx.respond("You don't have permission to do this")
             else:
-                print("Improper use of permissions decorator")
+                logger.warning("Improper use of permissions decorator")
         return wrapper
