@@ -22,7 +22,8 @@ RUN pip install -r requirements.txt && \
 
 # Buidling final image, moving over venv
 FROM python:3.11-slim-bookworm
-ENV DEBIAN_FRONTEND=noninteractive
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1
 
 WORKDIR /opt/SassBot
 

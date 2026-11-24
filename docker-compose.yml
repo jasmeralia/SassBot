@@ -8,6 +8,8 @@
 services:
   sassbot:
     image: ghcr.io/bombg/sassbot:latest
+    environment:
+      PYTHONUNBUFFERED: "1"
     volumes:
       - /home/bombg/Repos/SassBot/.env:/opt/SassBot/.env
       - /home/bombg/Repos/SassBot/sassBot.db:/opt/SassBot/sassBot.db
