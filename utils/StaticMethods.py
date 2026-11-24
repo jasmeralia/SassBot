@@ -1,14 +1,22 @@
 import time
 import os
-from Database import Database
+from utils.Database import Database
 import globals
-import base64
 import datetime
-from Constants import Constants
+from DefaultConstants import Settings as Settings
 from datetime import timedelta
 from datetime import date
 import re
 import tanjun
+import logging
+import secrets
+import hashlib
+import base64
+from urllib.parse import urlencode, urlunparse, urlparse
+
+baseSettings = Settings()
+logger = logging.getLogger(__name__)
+logger.setLevel(baseSettings.SASSBOT_LOG_LEVEL)
 
 def logCommand(funcName, ctx) -> None:
     file = open("commandLogs.txt", 'a')
@@ -16,25 +24,37 @@ def logCommand(funcName, ctx) -> None:
     if isinstance(ctx, tanjun.abc.SlashContext):
         file.write(f"{date} - {funcName} - used by {ctx.member.id} aka {ctx.member.display_name}\n")
     else:
-        print("didn't get right ctx for logger")
+        logger.warning("didn't get right ctx for command logger")
     file.close()
 
 def resetUnfinishedConfessions():
     db = Database()
-    unFinished = db.getUnfinishedReviews()
+    unFinished = db.getUnfinishedConfessionReviews()
     if unFinished:
         for row in unFinished:
-            if timeToSeconds(row[1]) >= Constants.TIME_BEFORE_REVIEW_RESET:
+            if timeToSeconds(row[1]) >= baseSettings.TIME_BEFORE_REVIEW_RESET:
                 db.resetConfessionDateReviewed(row[0])
+
+def resetUnfinishedAppeals():
+    db = Database()
+    unFinished = db.getUnfinishedAppealReviews()
+    if unFinished:
+        for row in unFinished:
+            if timeToSeconds(row[1]) >= baseSettings.TIME_BEFORE_REVIEW_RESET:
+                db.resetAppealDateReviewed(row[0])
 
 async def isPermission(ctx: tanjun.abc.SlashContext)-> bool:
     hasPermission = False
     roles = ctx.member.get_roles()
+    #canBan = ctx.member.permissions & hikari.Permissions.BAN_MEMBERS
+    if not baseSettings.whiteListedRoleIDs:
+        logger.warning("No one in whiteListedRoleIDs, no one can use mod commands")
     for role in roles:
-        if role.id in Constants.whiteListedRoleIDs or ctx.member.id in Constants.whiteListedRoleIDs:
+        if role.id in baseSettings.whiteListedRoleIDs or ctx.member.id in baseSettings.whiteListedRoleIDs:
             hasPermission = True
     if not hasPermission:
-        await ctx.respond("You don't have permission to do this",)
+        ctx.set_ephemeral_default(True)
+        await ctx.respond("You don't have permission to do this")
     return hasPermission
 
 def isRerun(title:str) -> bool:
@@ -63,7 +83,7 @@ def getWeekStreamingMinutes(startingDate: date, minutesDict = {}):
     db = Database()
     minutesBetweenOnlineChecks = 10
     daysInWeek = 7
-    weekMinutes = {"CB":0,"OF":0,"Twitch":0,"YT":0,"Fans":0,"Kick":0,"Cam4":0, "MFC":0, "BC":0 , "SC":0,"EP":0,"TotalTimeStreamingLive":0, "TotalTimeStreamingReruns":0} if not minutesDict else dict(minutesDict)
+    weekMinutes = {"CB":0,"OF":0,"Twitch":0,"YT":0,"Fans":0,"Kick":0,"Cam4":0, "MFC":0, "BC":0 , "SC":0,"EP":0,"MV":0,"TotalTimeStreamingLive":0, "TotalTimeStreamingReruns":0} if not minutesDict else dict(minutesDict)
     platforms = list(weekMinutes)
     platforms.remove("TotalTimeStreamingLive")
     platforms.remove("TotalTimeStreamingReruns")
@@ -79,7 +99,7 @@ def getWeekStreamingMinutes(startingDate: date, minutesDict = {}):
                             if "RR" in v['streaming']:
                                 weekMinutes["TotalTimeStreamingReruns"] += minutesBetweenOnlineChecks
                             for platform in platforms:
-                                if platform in v['streaming'] and not "RR-" + platform in v['streaming']:
+                                if platform in v['streaming'] and "RR-" + platform not in v['streaming']:
                                     weekMinutes[platform] += minutesBetweenOnlineChecks
                                     notOnlyRerunsFlag = True
                         if notOnlyRerunsFlag:
@@ -87,19 +107,19 @@ def getWeekStreamingMinutes(startingDate: date, minutesDict = {}):
     return weekMinutes
 
 def smartRebroadcast() -> None:
-    platforms = ['chaturbate','onlyfans','fansly','twitch','youtube','kick','cam4','mfc','bongacams', 'stripchat','eplay']
     db = Database()
+    platforms = db.GetPlatformNames()
     for platform in platforms:
         lastOnlineMessage,streamStartTime,streamEndTime,isRerun = db.getPlatformsRowValues(platform)
         secondsSinceLastMessage = timeToSeconds(lastOnlineMessage)
-        if secondsSinceLastMessage >= Constants.SECONDS_BETWEEN_SMART_ALERTS and streamStartTime > streamEndTime:
-            print(f"Smart alert for {platform}")
+        if secondsSinceLastMessage >= baseSettings.SECONDS_BETWEEN_SMART_ALERTS and streamStartTime > streamEndTime:
+            logger.info(f"Smart alert for {platform}")
             globals.rebroadcast[platform] = 1
 
 def getMaxOnlineInPresenceDict(presDict: dict) -> int:
     maxOnline = 0
     for k, v in presDict.items():
-        if v:
+        if v and 'online' in v:
             maxOnline = max(v["online"], maxOnline)
     return maxOnline
 
@@ -127,8 +147,8 @@ def getEmbedImage() -> str:
     if not twImgQue and twImgList:
         twImgQue = twImgList
     if not twImgList:
-        imageSrc = 'images/twitErrImg.jpg'
-        print("adding default image for embed since nothing is on the list.")
+        imageSrc = baseSettings.defaultThumbnail
+        logger.info("adding default image for embed since nothing is on the image list.")
     elif url:
         imageSrc = url
     else:
@@ -141,20 +161,11 @@ def unPin() -> None:
     db.setImgPin(0, "")
 
 def setRebroadcast() -> None:
-    print("rebroadcast: On")
-    globals.rebroadcast = {
-        "chaturbate":1,
-        "onlyfans":1,
-        "fansly":1,
-        "twitch":1,
-        "youtube":1,
-        "kick":1,
-        "cam4":1,
-        "mfc":1,
-        "bongacams":1,
-        "stripchat":1,
-        "eplay":1
-}
+    logger.info("rebroadcast: On")
+    db = Database()
+    platforms = db.GetPlatformNames()
+    for platform in platforms:
+        globals.rebroadcast[platform] = 1
 
 def addImageListQue(url: str) -> None:
     db = Database()
@@ -194,6 +205,7 @@ def checkOnline(db: Database) -> str:
     bcLastOnlineMessage,bcStreamStartTime,bcStreamEndTime, bcIsRerun = db.getPlatformsRowValues('bongacams')
     scLastOnlineMessage,scStreamStartTime,scStreamEndTime, scIsRerun = db.getPlatformsRowValues('stripchat')
     epLastOnlineMessage,epStreamStartTime,epStreamEndTime, epIsRerun = db.getPlatformsRowValues('eplay')
+    mvLastOnlineMessage,mvStreamStartTime,mvStreamEndTime, mvIsRerun = db.getPlatformsRowValues('manyvids')
     if cbStreamStartTime > cbStreamEndTime:
         playingString = playingString + "RR-CB " if cbIsRerun else playingString + "CB "
     if ofStreamStartTime > ofStreamEndTime:
@@ -216,6 +228,8 @@ def checkOnline(db: Database) -> str:
         playingString = playingString + "RR-SC " if scIsRerun else playingString + "SC "
     if epStreamStartTime > epStreamEndTime:
         playingString = playingString + "RR-EP " if epIsRerun else playingString + "EP "
+    if mvStreamStartTime > mvStreamEndTime:
+        playingString = playingString + "RR-MV " if mvIsRerun else playingString + "MV "
     if playingString and playingString[-1] == " ":
         playingString = playingString[:-1]
     return playingString
@@ -247,16 +261,106 @@ def timeToHoursMinutesTotalTime(totalTime: float) -> int:
     return totalTimeHours, leftoverMinutes
 
 def timeToSeconds(newTime: float) -> int:
-    if newTime == None:
+    if newTime is None:
         newTime = 0
     totalTime = time.time() - newTime
     totalTime = int(totalTime)
     return totalTime
 
 def rebootServer() -> None:
+    logger.critical("Sassbot server rebooting from restart command or fd leak detection or scheduled restart based off TIME_BEFORE_BOT_RESTART")
+    globals.botStartTime = time.time()
     os.system('reboot')
 
 def safeRebootServer() -> None:
+    logger.warning("Scheduled restart is happening.\nSleeping for 300 seconds before restart, in case something goes horribly wrong")
     time.sleep(300)
-    print("Scheduled restart is happening.\nSleeping for 300 seconds before restart, in case something goes horribly wrong")
     rebootServer()
+
+def GetThumbnail(tempThumbUrl, constantsThumbnail):
+    thumbnail = ""
+    if constantsThumbnail == "LIST":
+        thumbnail = ""
+    elif constantsThumbnail:
+        thumbnail = constantsThumbnail
+    elif tempThumbUrl:
+        thumbnail = tempThumbUrl
+    
+    return thumbnail
+
+def GetProxies(proxyIpPort):
+    proxies = {
+    'http': f'socks5://{proxyIpPort}',
+    'https': f'socks5://{proxyIpPort}'
+    }
+    return proxies
+
+def GetShortestActiveCheckTimer():
+    timerLengths = []
+    noDriverTimerLengths = []
+    if baseSettings.kickUserName and baseSettings.kickClientId:
+        timerLengths.append(baseSettings.KICK_CHECK_TIMER)
+    else:
+        noDriverTimerLengths.append(baseSettings.KICK_CHECK_TIMER)
+    if baseSettings.cbUserName:
+        timerLengths.append(baseSettings.CB_CHECK_TIMER)
+    if baseSettings.fansUserName:
+        noDriverTimerLengths.append(baseSettings.FANS_CHECK_TIMER)
+    if baseSettings.ofUserName:
+        noDriverTimerLengths.append(baseSettings.OF_CHECK_TIMER)
+    if baseSettings.ytUserName:
+        timerLengths.append(baseSettings.YT_CHECK_TIMER)
+    if baseSettings.twitchUserName:
+        timerLengths.append(baseSettings.TWITCH_CHECK_TIMER)
+    if baseSettings.cam4UserName:
+        timerLengths.append(baseSettings.CAM4_CHECK_TIMER)
+    if baseSettings.mfcUserName:
+        timerLengths.append(baseSettings.MFC_CHECK_TIMER)
+    if baseSettings.bcUserName:
+        timerLengths.append(baseSettings.BC_CHECK_TIMER)
+    if baseSettings.scUserName:
+        timerLengths.append(baseSettings.SC_CHECK_TIMER)
+    if baseSettings.epUserName:
+        timerLengths.append(baseSettings.EP_CHECK_TIMER)
+    if baseSettings.mvUserName:
+        timerLengths.append(baseSettings.MV_CHECK_TIMER)
+    shortest = 999999999999999999
+    ndShortest = 999999999999999999
+    for timer in timerLengths:
+        if timer < shortest:
+            shortest = timer
+    for timer in noDriverTimerLengths:
+        if timer < ndShortest:
+            ndShortest = timer
+    return shortest, ndShortest
+
+class EndpointFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        return record.args and len(record.args) >= 3 and record.args[2] != "/health"
+
+def GetCodeVerifier():
+    codeVerifier = secrets.token_urlsafe(64)
+    return codeVerifier
+
+def GetOauthState():
+    return secrets.token_urlsafe(32)
+
+def GetHashedCodeVerifier(codeVerifier):
+    return hashlib.sha256(codeVerifier.encode('utf-8')).digest()
+
+def GetCodeChallenge(hashedVerifier):
+    return base64.urlsafe_b64encode(hashedVerifier).rstrip(b'=').decode('utf-8')
+
+def EncodeParamsWithUrl(params: dict, url:str) -> str:
+    encoded_params = urlencode(params)
+    parsedUrl = urlparse(url)
+    fullUrl = urlunparse(parsedUrl._replace(query=encoded_params))
+    return fullUrl
+
+def GetKickClipUrlFromClipId(clipId:str) -> str:
+    clipUrl = ""
+    if clipId:
+        db = Database()
+        slug = db.GetChannelSlugFromClipId(clipId)
+        clipUrl = f'https://kick.com/{slug}/clips/{clipId}'
+    return clipUrl

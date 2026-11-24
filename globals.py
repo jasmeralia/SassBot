@@ -1,4 +1,3 @@
-from Constants import Constants
 import time
 
 globalPlayString = ""
@@ -17,9 +16,25 @@ rebroadcast = {
     "mfc":0,
     "bongacams":0,
     "stripchat":0,
-    "eplay":0
+    "eplay":0,
+    "manyvids":0
 }
 
 confessionIds = {"alert":0}
+appealIds = {"alert":0}
 
 browserOpen = False
+
+kickAccessToken = ""
+kickUserIds = {} # slug:userId
+kickProfilePics = {} # slug:url
+kickEventIds = []
+kickPublicKey = ""
+kickClipCursor = ""
+kickGiftUStrings = []
+kickOauth = {}
+kickLastAlertWebhook = 0
+kickVisitedCursors = []
+
+lastCheckTime = time.time()
+lastNoDriverCheckTime = time.time()

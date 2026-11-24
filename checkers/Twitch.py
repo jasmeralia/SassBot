@@ -1,38 +1,42 @@
 import requests
-import json
 from bs4 import BeautifulSoup
 import time
+import logging
+from DefaultConstants import Settings as Settings
+from utils.StaticMethods import GetThumbnail
 
-def isModelOnline(twitchChannelName):
+baseSettings = Settings()
+logger = logging.getLogger(__name__)
+logger.setLevel(baseSettings.SASSBOT_LOG_LEVEL)
+
+def isModelOnline(twitchChannelName: str):
+    twitchChannelName = twitchChannelName.lower()
     title = "placeholder twitch title"
-    thumbUrl = ''
+    tempThumbUrl = ''
     isOnline = False
-    icon = 'images/errIcon.png'
-    page = requests.get(f'https://www.twitch.tv/{twitchChannelName}')
-    time.sleep(1)
-    soup = BeautifulSoup(page.content, "html.parser")
-    twitchJson = getTwitchJson(soup)
-    if twitchJson:
-        title = twitchJson['@graph'][0]['description']
-        thumbUrl = twitchJson['@graph'][0]['thumbnailUrl'][2]
-        reticon = getIcon(soup)
-        if reticon:
-            icon = reticon
-        thumbUrlReq = requests.get(thumbUrl,allow_redirects=True)
-        time.sleep(1)
-        isOnlineJson = twitchJson['@graph'][0]['publication']['isLiveBroadcast']
-        if isOnlineJson and thumbUrl == thumbUrlReq.url:
-            isOnline = True
-    return isOnline, title, thumbUrl, icon
-
-def getTwitchJson(soup):
-    twitchJson = 0
+    icon = baseSettings.defaultIcon
     try:
-        twitchJson = soup.find_all("script", type="application/ld+json")
-        twitchJson = json.loads(twitchJson[0].text)
-    except IndexError:
-        pass
-    return twitchJson
+        isOnline = IsOnline(twitchChannelName)
+        time.sleep(1)
+        if isOnline:
+            isOnline = True
+            page = requests.get(f'https://www.twitch.tv/{twitchChannelName}')
+            tempThumbUrl = f'https://static-cdn.jtvnw.net/previews-ttv/live_user_{twitchChannelName}-640x360.jpg'
+            time.sleep(1)
+            soup = BeautifulSoup(page.content, "html.parser")
+            title = getTitle(soup)
+            reticon = getIcon(soup)
+            if reticon:
+                icon = reticon
+            tempThumbUrl = tempThumbUrl + "?" + str(int(time.time()))
+    except requests.exceptions.ConnectTimeout:
+        logger.warning("connection timed out to Twitch. Bot detection or rate limited?")
+    except requests.exceptions.SSLError:
+        logger.warning("SSL Error when attempting to connect to Twitch")
+    except TypeError:
+        logger.warning("twitch user banned or doesn't exist")
+    thumbUrl = GetThumbnail(tempThumbUrl, baseSettings.twitchThumbnail)
+    return isOnline, title, thumbUrl, icon
 
 def getIcon(soup):
     icon = 0
@@ -41,3 +45,16 @@ def getIcon(soup):
     except IndexError:
         pass
     return icon
+
+def getTitle(soup):
+    title = "placeholder twitch title"
+    try:
+        title = soup.find("meta", property="og:description")['content']
+    except IndexError:
+        pass
+    return title
+
+def IsOnline(channelName):
+    url = "https://gql.twitch.tv/gql"
+    query = "query {\n  user(login: \""+ channelName +"\") {\n    stream {\n      id\n    }\n  }\n}"
+    return True if requests.request("POST", url, json={"query": query, "variables": {}}, headers={"client-id": "kimne78kx3ncx6brgo4mv6wki5h1ko"}).json()["data"]["user"]["stream"] else False
