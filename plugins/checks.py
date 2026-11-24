@@ -33,6 +33,7 @@ import json
 import datetime
 import utils.KickDataGrabber as KickDataGrabber
 import requests
+import utils.NoDriverBrowserCreator as NDBrowserCreator
 
 baseSettings = Settings()
 component = tanjun.Component()
@@ -44,6 +45,8 @@ def load(client: tanjun.abc.Client) -> None:
     client.add_component(component.copy())
 
 async def platformChecker(isOnlineFunc: Callable,platformNotifFunc: Callable, userName: str, platformName: str, rest: hikari.impl.RESTClientImpl):
+    checkStarted = time.monotonic()
+    NDBrowserCreator.LogProcessMemory(f"check_start platform={platformName}")
     try:
         if inspect.iscoroutinefunction(isOnlineFunc):
             isOnline, title, thumbUrl, icon = await isOnlineFunc(userName)
@@ -57,6 +60,9 @@ async def platformChecker(isOnlineFunc: Callable,platformNotifFunc: Callable, us
         title = "NoTitle"
         isOnline = False
         icon = baseSettings.defaultIcon
+    finally:
+        NDBrowserCreator.LogProcessMemory(f"check_end platform={platformName}")
+        logger.debug("platform check duration platform=%s seconds=%.2f", platformName, time.monotonic() - checkStarted)
     isRerun = False
     db = Database()
     lastOnlineMessage,streamStartTime,streamEndTime = db.getPlatformAccountsRowValues(platformName,userName)

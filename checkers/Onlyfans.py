@@ -3,7 +3,6 @@ import re
 import asyncio
 import nodriver as uc
 import utils.NoDriverBrowserCreator as ndb
-import globals
 import logging
 from utils.StaticMethods import GetThumbnail
 
@@ -17,18 +16,20 @@ async def isModelOnline(ofUserName):
     title = baseSettings.ofDefaultTitle
     tempThumbUrl = ""
     icon = baseSettings.defaultIcon
+    browser = None
+    page = None
     try:
-        browser = await ndb.GetBrowser(proxy=baseSettings.OF_PROXY)
+        browser = await ndb.GetBrowser(proxy=baseSettings.OF_PROXY, checkName="onlyfans")
         await asyncio.sleep(1*baseSettings.NODRIVER_WAIT_MULTIPLIER)
         page = await browser.get(ofUrl, new_window=True)
         await asyncio.sleep(1*baseSettings.NODRIVER_WAIT_MULTIPLIER)
         await page.save_screenshot("Ofscreenshot.jpg")
         isOnline = await IsLiveBadge(page)
         icon  = await GetIcon(page)
-        await ndb.CloseNDBrowser(browser, page)
     except Exception as e:
         logger.warning(f"Error getting browser for Onylyfans: {e}")
-        globals.browserOpen = False
+    finally:
+        await ndb.CloseNDBrowser(browser, page, checkName="onlyfans")
     thumbUrl = GetThumbnail(tempThumbUrl, baseSettings.ofThumbnail)
     return isOnline, title, thumbUrl, icon
 

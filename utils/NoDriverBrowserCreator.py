@@ -45,7 +45,36 @@ def getUserAgent():
             logger.warning("Trouble getting user agent from jnrbsn's github. Using default")
         return userAgent
 
-async def GetBrowser(proxy=""):
+def LogProcessMemory(stage, browser=None, checkName=None):
+    try:
+        process = psutil.Process()
+        children = process.children(recursive=True)
+        childRss = 0
+        browserRss = 0
+        for child in children:
+            try:
+                rss = child.memory_info().rss
+                childRss += rss
+                if browser and child.pid == getattr(browser, "_process_pid", None):
+                    browserRss = rss
+            except psutil.Error:
+                continue
+        ownRss = process.memory_info().rss
+        logger.debug(
+            "process memory platform=%s stage=%s python_rss_mib=%.1f child_count=%d "
+            "child_rss_mib=%.1f browser_pid=%s browser_rss_mib=%.1f",
+            checkName or "unknown",
+            stage,
+            ownRss / (1024 * 1024),
+            len(children),
+            childRss / (1024 * 1024),
+            getattr(browser, "_process_pid", None),
+            browserRss / (1024 * 1024),
+        )
+    except psutil.Error:
+        logger.debug("could not collect process memory platform=%s stage=%s", checkName or "unknown", stage, exc_info=True)
+
+async def GetBrowser(proxy="", checkName=None):
     while globals.browserOpen:
         await asyncio.sleep(2 * baseSettings.NODRIVER_WAIT_MULTIPLIER)
     try:
@@ -68,6 +97,7 @@ async def GetBrowser(proxy=""):
                                 retries = baseSettings.NODRIVER_BROWSER_CONNECT_RETRIES,
                                 user_data_dir=dataDir
                                 )
+        LogProcessMemory("browser_started", browser, checkName)
         return browser
     except Exception as e:
         logger.warning(f"error creating browser in GetBrowser: {e}")
@@ -90,11 +120,25 @@ def IsRoot():
     except AttributeError:
         return ctypes.windll.shell32.IsUserAnAdmin() != 0
 
-async def CloseNDBrowser(browser, page):
-    await page.close()
-    await asyncio.sleep(1*baseSettings.NODRIVER_WAIT_MULTIPLIER)
-    browser.stop()
-    await asyncio.sleep(1*baseSettings.NODRIVER_WAIT_MULTIPLIER)
-    if platform.system() == "Linux":
-        KillUnconncetedBrowsers()
-    globals.browserOpen = False
+async def CloseNDBrowser(browser, page=None, checkName=None):
+    try:
+        if page is not None:
+            try:
+                await page.close()
+            except Exception:
+                logger.debug("could not close browser page", exc_info=True)
+        if browser is not None:
+            LogProcessMemory("browser_closing", browser, checkName)
+            try:
+                browser.stop()
+            except Exception:
+                logger.warning("could not stop browser", exc_info=True)
+            await asyncio.sleep(1 * baseSettings.NODRIVER_WAIT_MULTIPLIER)
+        if browser is not None and platform.system() == "Linux":
+            try:
+                KillUnconncetedBrowsers()
+            except Exception:
+                logger.warning("could not clean up remaining browser processes", exc_info=True)
+    finally:
+        globals.browserOpen = False
+        LogProcessMemory("browser_closed", checkName=checkName)

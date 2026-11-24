@@ -131,6 +131,15 @@ services:
 3. Fansly will 404 you for a period of time if you make too many requests from the same ip.
 4. If the requesting ip is in a state that requires age verification, some of these checkers wont work. 
 
+### Diagnosing browser-check memory growth
+
+Set `SASSBOT_LOG_LEVEL` to `10` (`DEBUG`) in `.env` to log each platform check's
+duration and the Python/browser-child RSS at check and browser lifecycle
+boundaries. Browser-backed checks close their page and browser in a `finally`
+block so cleanup still runs when a check raises. Compare the platform labels in
+these messages with container memory usage when investigating growth; process
+RSS does not include every byte charged to the container cgroup.
+
 ### Update History
 - 10/14/26
     - Fixed Kick integration (updated pusher key)

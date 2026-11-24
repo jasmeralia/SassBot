@@ -2,7 +2,7 @@
 # Commands that require a non default value will be marked with COMMAND
 # Any values you see are the default. This means any row/var you remove from the .env will use that value
 
-SASSBOT_LOG_LEVEL = 20 # DEBUG = 10, INFO = 20, WARNING = 30, ERROR = 40, CRITICAL = 50
+SASSBOT_LOG_LEVEL = 20 # DEBUG = 10 (includes per-check/browser memory diagnostics), INFO = 20, WARNING = 30, ERROR = 40, CRITICAL = 50
 OTHER_LIBRARIES_LOG_LEVEL = 20 # DEBUG = 10, INFO = 20, WARNING = 30, ERROR = 40, CRITICAL = 50
 
 SECRET = ''  #REQUIRED: Discord bot secret token

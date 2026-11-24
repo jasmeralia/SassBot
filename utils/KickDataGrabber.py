@@ -68,23 +68,27 @@ def GetApiCheckGlobals(db: Database, kickSlug):
     return apiUrl
     
 async def GetClipResultsNd(db:Database, apiUrl):
-    browser = await ndb.GetBrowser(proxy=baseSettings.KICK_PROXY)
     if globals.kickClipCursor in globals.kickVisitedCursors:
         logger.debug("browser out of order pre page load")
-        return
-    await asyncio.sleep(1*baseSettings.NODRIVER_WAIT_MULTIPLIER)
-    page = await browser.get(apiUrl)
-    await asyncio.sleep(1*baseSettings.NODRIVER_WAIT_MULTIPLIER)
-    await page.save_screenshot("KickClipsScreenshot.jpg")
-    content = await page.get_content()
-    content = content.split('<body>')
-    if len(content) < 2:
-        logger.warning("error with clip checker. user is banned,wrong username supplied, or cloudflare bot detection")
-    else:
-        jsonText = content[1].split('</body></html>')
-        results = json.loads(jsonText[0])
-    await ndb.CloseNDBrowser(browser, page)
-    return results
+        return None
+    browser = None
+    page = None
+    results = None
+    try:
+        browser = await ndb.GetBrowser(proxy=baseSettings.KICK_PROXY, checkName="kick_clips")
+        await asyncio.sleep(1 * baseSettings.NODRIVER_WAIT_MULTIPLIER)
+        page = await browser.get(apiUrl)
+        await asyncio.sleep(1 * baseSettings.NODRIVER_WAIT_MULTIPLIER)
+        await page.save_screenshot("KickClipsScreenshot.jpg")
+        content = (await page.get_content()).split("<body>")
+        if len(content) < 2:
+            logger.warning("error with clip checker. user is banned,wrong username supplied, or cloudflare bot detection")
+        else:
+            jsonText = content[1].split("</body></html>")
+            results = json.loads(jsonText[0])
+        return results
+    finally:
+        await ndb.CloseNDBrowser(browser, page, checkName="kick_clips")
 
 async def AnnounceWinnersHandleData(kickSlug: str, rest:hikari.impl.RESTClientImpl, db:Database):
     today = datetime.date.today()

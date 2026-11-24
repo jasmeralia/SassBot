@@ -2,7 +2,6 @@ from DefaultConstants import Settings as Settings
 import asyncio
 import nodriver as uc
 import utils.NoDriverBrowserCreator as ndb
-import globals
 import logging
 from utils.StaticMethods import GetThumbnail
 
@@ -16,8 +15,10 @@ async def isModelOnline(fansUserName):
     title = baseSettings.fansDefaultTitle
     isOnline = False
     icon = baseSettings.defaultIcon
+    browser = None
+    page = None
     try:
-        browser = await ndb.GetBrowser(proxy=baseSettings.FANS_PROXY)
+        browser = await ndb.GetBrowser(proxy=baseSettings.FANS_PROXY, checkName="fansly")
         await asyncio.sleep(1*baseSettings.NODRIVER_WAIT_MULTIPLIER)
         page = await browser.get(fansUrl)
         await asyncio.sleep(1*baseSettings.NODRIVER_WAIT_MULTIPLIER)
@@ -25,10 +26,10 @@ async def isModelOnline(fansUserName):
         isOnline = await IsLiveBadge(page)
         icon = await GetIcon(page)
         await page.save_screenshot("Fansscreenshot.jpg")
-        await ndb.CloseNDBrowser(browser,page)
     except Exception as e:
         logger.warning(f"Error when getting browser for Fansly: {e}")
-        globals.browserOpen = False
+    finally:
+        await ndb.CloseNDBrowser(browser, page, checkName="fansly")
     thumbUrl = GetThumbnail(tempThumbUrl, baseSettings.fansThumbnail)
     return isOnline, title, thumbUrl, icon
 

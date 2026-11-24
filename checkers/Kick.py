@@ -32,14 +32,17 @@ async def isModelOnline(kickUserName):
 
 async def GetNdJson(apiUrl):
     results = ""
-    browser = await ndb.GetBrowser(proxy=baseSettings.KICK_PROXY)
-    await asyncio.sleep(1*baseSettings.NODRIVER_WAIT_MULTIPLIER)
-    page = await browser.get(apiUrl)
-    await asyncio.sleep(1*baseSettings.NODRIVER_WAIT_MULTIPLIER)
-    await page.save_screenshot("KickScreenshot.jpg")
-    content = await page.get_content()
-    content = content.split('<body>')
-    await ndb.CloseNDBrowser(browser,page)
+    browser = None
+    page = None
+    try:
+        browser = await ndb.GetBrowser(proxy=baseSettings.KICK_PROXY, checkName="kick")
+        await asyncio.sleep(1 * baseSettings.NODRIVER_WAIT_MULTIPLIER)
+        page = await browser.get(apiUrl)
+        await asyncio.sleep(1 * baseSettings.NODRIVER_WAIT_MULTIPLIER)
+        await page.save_screenshot("KickScreenshot.jpg")
+        content = (await page.get_content()).split("<body>")
+    finally:
+        await ndb.CloseNDBrowser(browser, page, checkName="kick")
     if len(content) >= 2:
         jsonText = content[1].split('</body></html>')
         results = json.loads(jsonText[0])
